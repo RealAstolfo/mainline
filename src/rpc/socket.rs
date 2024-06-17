@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
 use tracing::{debug, trace};
+use std::sync::Arc;
 
 use crate::common::{ErrorSpecific, Message, MessageType, RequestSpecific, ResponseSpecific};
 
@@ -20,7 +21,7 @@ pub const READ_TIMEOUT: Duration = Duration::from_millis(10);
 #[derive(Debug)]
 pub struct KrpcSocket {
     next_tid: u16,
-    socket: UdpSocket,
+    socket: Arc<UdpSocket>,
     read_only: bool,
     request_timeout: Duration,
     /// We don't need a HashMap, since we know the capacity is `65536` requests.
@@ -49,7 +50,7 @@ impl KrpcSocket {
         socket.set_read_timeout(Some(READ_TIMEOUT))?;
 
         Ok(Self {
-            socket,
+            socket: Arc::new(socket),
             next_tid: 0,
             read_only: settings.server.is_none(),
             request_timeout: settings.request_timeout.unwrap_or(DEFAULT_REQUEST_TIMEOUT),
@@ -67,6 +68,11 @@ impl KrpcSocket {
 
     // === Public Methods ===
 
+    /// Steals the socket
+    pub fn socket(&mut self) -> Arc<UdpSocket> {
+	Arc::clone(&self.socket)
+    }
+    
     /// Returns true if this message's transaction_id is still inflight
     pub fn inflight(&self, transaction_id: &u16) -> bool {
         self.inflight_requests

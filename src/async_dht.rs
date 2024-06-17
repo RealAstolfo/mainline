@@ -1,7 +1,8 @@
 //! AsyncDht node.
 
 use bytes::Bytes;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, UdpSocket};
+use std::sync::Arc;
 
 use crate::{
     common::{
@@ -43,11 +44,17 @@ impl AsyncDht {
 
         receiver.recv_async().await?;
 
-        self.0.address = None;
+        self.0.socket = None;
 
         Ok(())
     }
 
+
+    /// Steal the socket.
+    pub async fn socket(&self) -> Arc<UdpSocket> {
+	<Option<Arc<UdpSocket>> as Clone>::clone(&self.0.socket).expect("Could not steal the socket, is the dht running?")
+    }
+    
     // === Peers ===
 
     /// Get peers for a given infohash.

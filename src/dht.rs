@@ -1,6 +1,6 @@
 //! Dht node.
 
-use std::{net::SocketAddr, thread, time::Duration};
+use std::{net::{SocketAddr, UdpSocket}, thread, time::Duration, sync::Arc};
 
 use bytes::Bytes;
 use flume::{Receiver, Sender};
@@ -22,7 +22,7 @@ use crate::{
 /// Mainlin eDht node.
 pub struct Dht {
     pub(crate) sender: Sender<ActorMessage>,
-    pub(crate) address: Option<SocketAddr>,
+    pub(crate) socket: Option<Arc<UdpSocket>>,
 }
 
 pub struct Builder {
@@ -113,10 +113,15 @@ impl Dht {
     pub fn new(settings: DhtSettings) -> Result<Self> {
         let (sender, receiver) = flume::bounded(32);
 
-        let rpc = Rpc::new(&settings)?;
+        let mut rpc = Rpc::new(&settings)?;
 
-        let address = rpc.local_addr();
+        let socket = rpc.socket();
 
+	let address = match socket.local_addr() {
+	    Ok(addr) => Some(addr),
+	    Err(_) => None,
+	};
+	
         info!(?address, "Mainline DHT listening");
 
         let mut server = settings.server;
@@ -125,7 +130,7 @@ impl Dht {
 
         Ok(Dht {
             sender,
-            address: Some(address),
+            socket: Some(socket),
         })
     }
 
@@ -135,7 +140,15 @@ impl Dht {
     ///
     /// Returns `None` if the node is shutdown
     pub fn local_addr(&self) -> Option<SocketAddr> {
-        self.address
+        if self.socket.is_some() {
+	    let socket = self.socket.as_ref().unwrap();
+	    match socket.local_addr() {
+		Ok(addr) => Some(addr),
+		Err(_) => None
+	    }
+	} else {
+	    None
+	}
     }
 
     // === Public Methods ===
@@ -148,7 +161,7 @@ impl Dht {
 
         receiver.recv()?;
 
-        self.address = None;
+        self.socket = None;
 
         Ok(())
     }

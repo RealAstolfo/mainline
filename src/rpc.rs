@@ -4,9 +4,10 @@ mod query;
 mod socket;
 
 use std::collections::HashMap;
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
+use std::sync::Arc;
 
 use bytes::Bytes;
 use flume::Sender;
@@ -117,6 +118,11 @@ impl Rpc {
         &self.id
     }
 
+    /// Steals the Socket.
+    pub fn socket(&mut self) -> Arc<UdpSocket> {
+	self.socket.socket()
+    }
+    
     /// Returns the address the server is listening to.
     #[inline]
     pub fn local_addr(&self) -> SocketAddr {
