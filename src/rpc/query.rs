@@ -182,7 +182,9 @@ impl PutQuery {
     pub fn start(&mut self, socket: &mut KrpcSocket, nodes: Vec<Node>) {
         // Already started.
         if !self.inflight_requests.is_empty() {
-            panic!("should not call PutQuery.start() twice");
+	    // panicking for this is dumb when you need to reannounce things.
+	    // panic!("should not call PutQuery.start() twice");
+	    return;
         };
 
         let target = self.target;
