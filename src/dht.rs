@@ -1,6 +1,6 @@
 //! Dht node.
 
-use std::{net::{SocketAddr, UdpSocket}, thread, time::Duration, sync::Arc};
+use std::{net::{SocketAddr, UdpSocket}, thread, time::Duration, sync::{Arc, Barrier}};
 
 use bytes::Bytes;
 use flume::{Receiver, Sender};
@@ -166,6 +166,15 @@ impl Dht {
         Ok(())
     }
 
+    /// Pause actions on dht (think about changing name to discard, since thats effectively whats happenning)
+    pub fn pause(&mut self, barrier: Arc<Barrier>) -> Result<Arc<UdpSocket>> {
+        self.sender.send(ActorMessage::Pause(barrier))?;
+
+	let socket = Arc::clone(&<std::option::Option<Arc<UdpSocket>> as Clone>::clone(&self.socket).unwrap());
+
+        Ok(socket)
+    }
+    
     // === Peers ===
 
     /// Get peers for a given infohash.
@@ -314,11 +323,14 @@ fn run(mut rpc: Rpc, server: &mut Option<Box<dyn Server>>, receiver: Receiver<Ac
                     let _ = sender.send(());
                     break;
                 }
+		ActorMessage::Pause(barrier) => {
+		    drop(barrier.wait());
+		}
                 ActorMessage::Put(target, request, sender) => {
-                    rpc.put(target, request, Some(sender));
-                }
+		    rpc.put(target, request, Some(sender));
+		}
                 ActorMessage::Get(target, request, sender) => {
-                    rpc.get(target, request, Some(sender), None)
+		    rpc.get(target, request, Some(sender), None);
                 }
             }
         }
@@ -342,6 +354,7 @@ pub enum ActorMessage {
     Put(Id, PutRequestSpecific, Sender<PutResult>),
     Get(Id, RequestTypeSpecific, ResponseSender),
     Shutdown(Sender<()>),
+    Pause(Arc<Barrier>),
 }
 
 /// Create a testnet of Dht nodes to run tests against instead of the real mainline network.

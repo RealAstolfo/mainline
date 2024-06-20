@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use std::net::{SocketAddr, UdpSocket};
-use std::sync::Arc;
+use std::sync::{Arc, Barrier};
 
 use crate::{
     common::{
@@ -45,14 +45,18 @@ impl AsyncDht {
         receiver.recv_async().await?;
 
         self.0.socket = None;
-
+	
         Ok(())
     }
 
 
-    /// Steal the socket.
-    pub async fn socket(&self) -> Arc<UdpSocket> {
-	<Option<Arc<UdpSocket>> as Clone>::clone(&self.0.socket).expect("Could not steal the socket, is the dht running?")
+    /// Pause actions on dht (think about changing name to discard, since thats effectively whats happenning)
+    pub async fn pause(&mut self, lock: Arc<Barrier>) -> Result<Arc<UdpSocket>> {
+        self.0.sender.send(ActorMessage::Pause(lock))?;
+
+	let socket = Arc::clone(&<std::option::Option<Arc<UdpSocket>> as Clone>::clone(&self.0.socket).unwrap());
+
+	Ok(socket)
     }
     
     // === Peers ===
