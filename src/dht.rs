@@ -324,7 +324,9 @@ fn run(mut rpc: Rpc, server: &mut Option<Box<dyn Server>>, receiver: Receiver<Ac
                     break;
                 }
 		ActorMessage::Pause(barrier) => {
+		    println!("Dht paused!");
 		    drop(barrier.wait());
+		    println!("Dht resumed!");
 		}
                 ActorMessage::Put(target, request, sender) => {
 		    rpc.put(target, request, Some(sender));
